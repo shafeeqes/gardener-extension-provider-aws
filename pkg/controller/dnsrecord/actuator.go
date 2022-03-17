@@ -17,15 +17,16 @@ package dnsrecord
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/dnsrecord"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
-	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	extensionsv1alpha1helper "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1/helper"
 	"github.com/gardener/gardener/pkg/controllerutils/reconciler"
@@ -65,11 +66,11 @@ func (a *actuator) Reconcile(ctx context.Context, dns *extensionsv1alpha1.DNSRec
 	// Create AWS client
 	credentials, err := aws.GetCredentialsFromSecretRef(ctx, a.client, dns.Spec.SecretRef, true)
 	if err != nil {
-		return fmt.Errorf("could not get AWS credentials: %+v", err)
+		return helper.DetermineError(err, "could not get AWS credentials")
 	}
 	awsClient, err := a.awsClientFactory.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), getRegion(dns, credentials))
 	if err != nil {
-		return fmt.Errorf("could not create AWS client: %+v", err)
+		return helper.DetermineError(err, "could not create AWS client")
 	}
 
 	// Determine DNS hosted zone ID
@@ -105,17 +106,17 @@ func (a *actuator) Delete(ctx context.Context, dns *extensionsv1alpha1.DNSRecord
 	// Create AWS client
 	credentials, err := aws.GetCredentialsFromSecretRef(ctx, a.client, dns.Spec.SecretRef, true)
 	if err != nil {
-		return fmt.Errorf("could not get AWS credentials: %+v", err)
+		return helper.DetermineError(err, "could not get AWS credentials")
 	}
 	awsClient, err := a.awsClientFactory.NewClient(string(credentials.AccessKeyID), string(credentials.SecretAccessKey), getRegion(dns, credentials))
 	if err != nil {
-		return fmt.Errorf("could not create AWS client: %+v", err)
+		return helper.DetermineError(err, "could not create AWS client")
 	}
 
 	// Determine DNS hosted zone ID
 	zone, err := a.getZone(ctx, dns, awsClient)
 	if err != nil {
-		return err
+		return helper.DetermineError(err, "")
 	}
 
 	// Delete DNS recordset
@@ -154,7 +155,7 @@ func (a *actuator) getZone(ctx context.Context, dns *extensionsv1alpha1.DNSRecor
 		a.logger.Info("Got DNS hosted zones", "zones", zones, "dnsrecord", kutil.ObjectName(dns))
 		zone := dnsrecord.FindZoneForName(zones, dns.Spec.Name)
 		if zone == "" {
-			return "", gardencorev1beta1helper.NewErrorWithCodes(fmt.Sprintf("could not find DNS hosted zone for name %s", dns.Spec.Name), gardencorev1beta1.ErrorConfigurationProblem)
+			return "", fmt.Errorf("could not find DNS hosted zone for name %s", dns.Spec.Name)
 		}
 		return zone, nil
 	}
@@ -172,11 +173,10 @@ func getRegion(dns *extensionsv1alpha1.DNSRecord, credentials *aws.Credentials) 
 }
 
 func wrapAWSClientError(err error, message string) error {
-	wrappedErr := fmt.Errorf("%s: %+v", message, err)
-	if awsclient.IsNoSuchHostedZoneError(err) || awsclient.IsNotPermittedInZoneError(err) {
-		wrappedErr = gardencorev1beta1helper.NewErrorWithCodes(wrappedErr.Error(), gardencorev1beta1.ErrorConfigurationProblem)
-	}
-	if _, ok := err.(*awsclient.Route53RateLimiterWaitError); ok || awsclient.IsThrottlingError(err) {
+	wrappedErr := helper.DetermineError(err, message)
+
+	_, awsErrMsg := helper.GetAWSErrorCode(err)
+	if _, ok := err.(*awsclient.Route53RateLimiterWaitError); ok || strings.Contains(awsErrMsg, "Throttling") {
 		wrappedErr = &reconciler.RequeueAfterError{
 			Cause:        wrappedErr,
 			RequeueAfter: requeueAfterOnThrottlingError,

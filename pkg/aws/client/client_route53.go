@@ -17,14 +17,13 @@ package client
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 )
 
 // GetDNSHostedZones returns a map of all DNS hosted zone names mapped to their IDs.
@@ -71,7 +70,11 @@ func (c *Client) DeleteDNSHostedZone(ctx context.Context, zoneId string) error {
 	_, err := c.Route53.DeleteHostedZoneWithContext(ctx, &route53.DeleteHostedZoneInput{
 		Id: aws.String(zoneId),
 	})
-	return ignoreHostedZoneNotFound(err)
+
+	if awsErrCode, _ := helper.GetAWSErrorCode(err); awsErrCode == route53.ErrCodeHostedZoneNotFound {
+		return nil
+	}
+	return err
 }
 
 func normalizeName(name string) string {
@@ -144,7 +147,10 @@ func (c *Client) DeleteDNSRecordSet(ctx context.Context, zoneId, name, recordTyp
 		}
 		_, err = c.Route53.ChangeResourceRecordSetsWithContext(ctx, newChangeResourceRecordSetsInput(zoneId, route53.ChangeActionDelete, rrs))
 	}
-	return ignoreResourceRecordSetNotFound(err)
+	if awsErrCode, awsErrMsg := helper.GetAWSErrorCode(err); awsErrCode == route53.ErrCodeInvalidChangeBatch && strings.Contains(awsErrMsg, "it was not found") {
+		return nil
+	}
+	return err
 }
 
 // GetDNSRecordSet returns the DNS recordset in the DNS hosted zone with the given zone ID, and with the given name and type.
@@ -158,7 +164,7 @@ func (c *Client) GetDNSRecordSet(ctx context.Context, zoneId, name, recordType s
 		StartRecordName: aws.String(name),
 		StartRecordType: aws.String(recordType),
 	})
-	if ignoreResourceRecordSetNotFound(err) != nil {
+	if awsErrCode, awsErrMsg := helper.GetAWSErrorCode(err); awsErrCode != route53.ErrCodeInvalidChangeBatch || !strings.Contains(awsErrMsg, "it was not found") {
 		return nil, err
 	}
 	if out == nil || len(out.ResourceRecordSets) == 0 { // no records in zone
@@ -324,54 +330,9 @@ func encloseInQuotes(s string) string {
 	return s
 }
 
-func ignoreResourceRecordSetNotFound(err error) error {
-	if err == nil {
-		return nil
-	}
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == route53.ErrCodeInvalidChangeBatch && strings.Contains(aerr.Message(), "it was not found") {
-		return nil
-	}
-	return err
-}
-
-func ignoreHostedZoneNotFound(err error) error {
-	if err == nil {
-		return nil
-	}
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == route53.ErrCodeHostedZoneNotFound {
-		return nil
-	}
-	return err
-}
-
 func isValuesDoNotMatchError(err error) bool {
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == route53.ErrCodeInvalidChangeBatch && strings.Contains(aerr.Message(), "the values provided do not match the current values") {
-		return true
-	}
-	return false
-}
-
-// IsNoSuchHostedZoneError returns true if the error indicates a non-existing route53 hosted zone.
-func IsNoSuchHostedZoneError(err error) bool {
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == route53.ErrCodeNoSuchHostedZone {
-		return true
-	}
-	return false
-}
-
-var notPermittedInZoneRegex = regexp.MustCompile(`RRSet with DNS name [^\ ]+ is not permitted in zone [^\ ]+`)
-
-// IsNotPermittedInZoneError returns true if the error indicates that the DNS name is not permitted in the route53 hosted zone.
-func IsNotPermittedInZoneError(err error) bool {
-	if aerr, ok := err.(awserr.Error); ok && aerr.Code() == route53.ErrCodeInvalidChangeBatch && notPermittedInZoneRegex.MatchString(aerr.Message()) {
-		return true
-	}
-	return false
-}
-
-// IsThrottlingError returns true if the error is a throttling error.
-func IsThrottlingError(err error) bool {
-	if aerr, ok := err.(awserr.Error); ok && strings.Contains(aerr.Message(), "Throttling") {
+	awsErrCode, awsErrMsg := helper.GetAWSErrorCode(err)
+	if awsErrCode == route53.ErrCodeInvalidChangeBatch && strings.Contains(awsErrMsg, "the values provided do not match the current values") {
 		return true
 	}
 	return false
