@@ -150,6 +150,7 @@ func (r *reconciler) reconcile(ctx context.Context, logger logr.Logger, infrastr
 
 	logger.Info("Starting the reconciliation of infrastructure", "infrastructure", kutil.ObjectName(infrastructure))
 	if err := r.actuator.Reconcile(ctx, infrastructure, cluster); err != nil {
+		err = r.actuator.DetermineError(err, err.Error())
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
