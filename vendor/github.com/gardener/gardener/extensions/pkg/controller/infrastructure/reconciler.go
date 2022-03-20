@@ -173,6 +173,7 @@ func (r *reconciler) delete(ctx context.Context, logger logr.Logger, infrastruct
 	}
 
 	if err := r.actuator.Delete(ctx, infrastructure, cluster); err != nil {
+		err = r.actuator.DetermineError(err, err.Error())
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeDelete, "Error deleting infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
