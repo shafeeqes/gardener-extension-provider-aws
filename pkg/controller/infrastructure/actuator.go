@@ -17,6 +17,7 @@ package infrastructure
 import (
 	"time"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/imagevector"
 
@@ -57,7 +58,7 @@ func newTerraformer(
 	terraformer.Terraformer,
 	error,
 ) {
-	tf, err := terraformer.NewForConfig(logger, restConfig, purpose, infra.Namespace, infra.Name, imagevector.TerraformerImage())
+	tf, err := terraformer.NewForConfig(logger, restConfig, purpose, infra.Namespace, infra.Name, imagevector.TerraformerImage(), helper.NewErrorCodeDetector())
 	if err != nil {
 		return nil, err
 	}

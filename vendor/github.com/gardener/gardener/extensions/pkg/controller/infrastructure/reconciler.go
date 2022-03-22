@@ -39,9 +39,10 @@ import (
 )
 
 type reconciler struct {
-	logger          logr.Logger
-	actuator        Actuator
-	configValidator ConfigValidator
+	logger            logr.Logger
+	actuator          Actuator
+	configValidator   ConfigValidator
+	errorCodeDetector ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -50,16 +51,17 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // infrastructure resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator, configValidator ConfigValidator) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, configValidator ConfigValidator, errorCodeDetector ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.Infrastructure{} },
 		&reconciler{
-			logger:          logger,
-			actuator:        actuator,
-			configValidator: configValidator,
-			statusUpdater:   extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			configValidator:   configValidator,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -150,7 +152,7 @@ func (r *reconciler) reconcile(ctx context.Context, logger logr.Logger, infrastr
 
 	logger.Info("Starting the reconciliation of infrastructure", "infrastructure", kutil.ObjectName(infrastructure))
 	if err := r.actuator.Reconcile(ctx, infrastructure, cluster); err != nil {
-		err = r.actuator.DetermineError(err, err.Error())
+		err = r.errorCodeDetector.DetermineError(err, err.Error())
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -173,7 +175,7 @@ func (r *reconciler) delete(ctx context.Context, logger logr.Logger, infrastruct
 	}
 
 	if err := r.actuator.Delete(ctx, infrastructure, cluster); err != nil {
-		err = r.actuator.DetermineError(err, err.Error())
+		err = r.errorCodeDetector.DetermineError(err, err.Error())
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeDelete, "Error deleting infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}

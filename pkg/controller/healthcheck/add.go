@@ -17,6 +17,7 @@ package healthcheck
 import (
 	"time"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
@@ -42,6 +43,7 @@ var (
 	// DefaultAddOptions are the default DefaultAddArgs for AddToManager.
 	DefaultAddOptions = healthcheck.DefaultAddArgs{
 		HealthCheckConfig: healthcheckconfig.HealthCheckConfig{SyncPeriod: metav1.Duration{Duration: defaultSyncPeriod}},
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 	}
 )
 

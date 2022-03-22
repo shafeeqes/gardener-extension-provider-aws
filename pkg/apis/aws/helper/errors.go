@@ -15,14 +15,42 @@
 package helper
 
 import (
+	"errors"
 	"regexp"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/route53"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
+
+type errorCodeDetector struct {
+}
+
+func NewErrorCodeDetector() errorutil.ErrorCodeDetector {
+	return &errorCodeDetector{}
+}
+
+// DetermineError determines the Garden error code for the given error and creates a new error with the given message.
+func (e *errorCodeDetector) DetermineError(err error) error {
+	if err == nil {
+		return nil
+	}
+
+	unwrappedError := errors.Unwrap(err)
+	if unwrappedError == nil {
+		unwrappedError = err
+	}
+
+	codes := DetermineErrorCodes(unwrappedError)
+	if codes == nil {
+		return errors.New(err.Error())
+	}
+	return gardencorev1beta1helper.NewErrorWithCodes(err.Error(), codes...)
+}
 
 // DetermineErrorCodes determines error codes based on the given error.
 func DetermineErrorCodes(err error) []gardencorev1beta1.ErrorCode {

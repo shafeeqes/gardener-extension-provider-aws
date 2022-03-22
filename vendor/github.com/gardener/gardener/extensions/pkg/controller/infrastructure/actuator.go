@@ -32,6 +32,4 @@ type Actuator interface {
 	Restore(context.Context, *extensionsv1alpha1.Infrastructure, *extensionscontroller.Cluster) error
 	// Migrate deletes the terraform k8s resources without deleting the corresponding resources in the IaaS provider
 	Migrate(context.Context, *extensionsv1alpha1.Infrastructure, *extensionscontroller.Cluster) error
-	// DetermineError determines the Gardener error code for the given error and creates a new error with the given message.
-	DetermineError(err error, message string) error
 }
