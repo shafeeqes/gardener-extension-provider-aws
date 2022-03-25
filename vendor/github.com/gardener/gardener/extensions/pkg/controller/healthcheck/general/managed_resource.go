@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	"github.com/gardener/gardener/pkg/utils/kubernetes/health"
@@ -62,7 +63,7 @@ func (healthChecker *ManagedResourceHealthChecker) DeepCopy() healthcheck.Health
 }
 
 // Check executes the health check
-func (healthChecker *ManagedResourceHealthChecker) Check(ctx context.Context, request types.NamespacedName) (*healthcheck.SingleCheckResult, error) {
+func (healthChecker *ManagedResourceHealthChecker) Check(ctx context.Context, request types.NamespacedName, errorCodeDetector errorutil.ErrorCodeDetector) (*healthcheck.SingleCheckResult, error) {
 	mcmDeployment := &resourcesv1alpha1.ManagedResource{}
 
 	if err := healthChecker.seedClient.Get(ctx, client.ObjectKey{Namespace: request.Namespace, Name: healthChecker.managedResourceName}, mcmDeployment); err != nil {
@@ -82,7 +83,7 @@ func (healthChecker *ManagedResourceHealthChecker) Check(ctx context.Context, re
 		return &healthcheck.SingleCheckResult{
 			Status: gardencorev1beta1.ConditionFalse,
 			Detail: err.Error(),
-			Codes:  gardencorev1beta1helper.DetermineErrorCodes(err),
+			Codes:  gardencorev1beta1helper.ExtractErrorCodes(errorCodeDetector.DetermineError(err)),
 		}, nil
 	}
 

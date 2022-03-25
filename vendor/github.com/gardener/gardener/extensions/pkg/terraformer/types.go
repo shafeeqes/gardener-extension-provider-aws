@@ -18,6 +18,8 @@ import (
 	"context"
 	"time"
 
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
+
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,9 +51,10 @@ import (
 type terraformer struct {
 	useV1 bool
 
-	logger       logr.Logger
-	client       client.Client
-	coreV1Client corev1client.CoreV1Interface
+	logger            logr.Logger
+	client            client.Client
+	coreV1Client      corev1client.CoreV1Interface
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	purpose   string
 	name      string
@@ -145,8 +148,8 @@ type Initializer interface {
 
 // Factory is a factory that can produce Terraformer and Initializer.
 type Factory interface {
-	NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string) (Terraformer, error)
-	New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string) Terraformer
+	NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) (Terraformer, error)
+	New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) Terraformer
 	DefaultInitializer(c client.Client, main, variables string, tfVars []byte, stateInitializer StateConfigMapInitializer) Initializer
 }
 

@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 )
@@ -117,7 +118,7 @@ func (h *Result) GetDetails() string {
 // returning an error means the health check could not be conducted and will result in a condition with with type "Unknown" and reason "ConditionCheckError"
 type HealthCheck interface {
 	// Check is the function that executes the actual health check
-	Check(context.Context, types.NamespacedName) (*SingleCheckResult, error)
+	Check(context.Context, types.NamespacedName, errorutil.ErrorCodeDetector) (*SingleCheckResult, error)
 	// SetLoggerSuffix injects the logger
 	SetLoggerSuffix(string, string)
 	// DeepCopy clones the healthCheck

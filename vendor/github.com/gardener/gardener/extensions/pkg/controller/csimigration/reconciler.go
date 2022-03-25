@@ -20,6 +20,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/util"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
@@ -42,7 +43,8 @@ import (
 const RequeueAfter = time.Minute
 
 type reconciler struct {
-	logger logr.Logger
+	logger            logr.Logger
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client client.Client
 
@@ -52,9 +54,10 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // Cluster resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(csiMigrationKubernetesVersion string, storageClassNameToLegacyProvisioner map[string]string) reconcile.Reconciler {
+func NewReconciler(errorCodeDetector errorutil.ErrorCodeDetector, csiMigrationKubernetesVersion string, storageClassNameToLegacyProvisioner map[string]string) reconcile.Reconciler {
 	return &reconciler{
 		logger:                              log.Log.WithName(ControllerName),
+		errorCodeDetector:                   errorCodeDetector,
 		csiMigrationKubernetesVersion:       csiMigrationKubernetesVersion,
 		storageClassNameToLegacyProvisioner: storageClassNameToLegacyProvisioner,
 	}

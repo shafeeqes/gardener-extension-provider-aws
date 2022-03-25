@@ -16,8 +16,9 @@ package csimigration
 
 import (
 	extensionspredicate "github.com/gardener/gardener/extensions/pkg/predicate"
-
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -39,6 +40,8 @@ const (
 
 // AddArgs are arguments for adding an csimigration controller to a manager.
 type AddArgs struct {
+	// ErrorCodeDetector determines the Gardener error codes for errors.
+	ErrorCodeDetector errorutil.ErrorCodeDetector
 	// ControllerOptions are the controller options used for creating a controller.
 	// The options.Reconciler is always overridden with a reconciler created from the
 	// given actuator.
@@ -58,7 +61,7 @@ type AddArgs struct {
 // Add creates a new CSIMigration Controller and adds it to the Manager.
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, args AddArgs) error {
-	args.ControllerOptions.Reconciler = NewReconciler(args.CSIMigrationKubernetesVersion, args.StorageClassNameToLegacyProvisioner)
+	args.ControllerOptions.Reconciler = NewReconciler(args.ErrorCodeDetector, args.CSIMigrationKubernetesVersion, args.StorageClassNameToLegacyProvisioner)
 	args.ControllerOptions.RecoverPanic = true
 
 	ctrl, err := controller.New(ControllerName, mgr, args.ControllerOptions)

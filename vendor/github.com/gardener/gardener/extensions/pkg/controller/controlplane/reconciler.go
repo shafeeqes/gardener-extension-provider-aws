@@ -29,6 +29,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/common"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
@@ -42,8 +43,9 @@ import (
 const RequeueAfter = 2 * time.Second
 
 type reconciler struct {
-	logger   logr.Logger
-	actuator Actuator
+	logger            logr.Logger
+	actuator          Actuator
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -52,15 +54,16 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // controlplane resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.ControlPlane{} },
 		&reconciler{
-			logger:        logger,
-			actuator:      actuator,
-			statusUpdater: extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -142,6 +145,8 @@ func (r *reconciler) reconcile(ctx context.Context, cp *extensionsv1alpha1.Contr
 	r.logger.Info("Starting the reconciliation of controlplane", "controlplane", kutil.ObjectName(cp))
 	requeue, err := r.actuator.Reconcile(ctx, cp, cluster)
 	if err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, cp, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling controlplane")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -168,6 +173,8 @@ func (r *reconciler) restore(ctx context.Context, cp *extensionsv1alpha1.Control
 	r.logger.Info("Starting the restoration of controlplane", "controlplane", kutil.ObjectName(cp))
 	requeue, err := r.actuator.Restore(ctx, cp, cluster)
 	if err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, cp, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeRestore, "Error restoring controlplane")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -194,6 +201,8 @@ func (r *reconciler) migrate(ctx context.Context, cp *extensionsv1alpha1.Control
 
 	r.logger.Info("Starting the migration of controlplane", "controlplane", kutil.ObjectName(cp))
 	if err := r.actuator.Migrate(ctx, cp, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, cp, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeMigrate, "Error migrating controlplane")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -227,6 +236,8 @@ func (r *reconciler) delete(ctx context.Context, cp *extensionsv1alpha1.ControlP
 
 	r.logger.Info("Starting the deletion of controlplane", "controlplane", kutil.ObjectName(cp))
 	if err := r.actuator.Delete(ctx, cp, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, cp, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error deleting controlplane")
 		return reconcilerutils.ReconcileErr(err)
 	}

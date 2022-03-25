@@ -29,6 +29,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/common"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
@@ -39,9 +40,10 @@ import (
 )
 
 type reconciler struct {
-	logger          logr.Logger
-	actuator        Actuator
-	configValidator ConfigValidator
+	logger            logr.Logger
+	actuator          Actuator
+	configValidator   ConfigValidator
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -50,16 +52,17 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // infrastructure resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator, configValidator ConfigValidator) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, configValidator ConfigValidator, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.Infrastructure{} },
 		&reconciler{
-			logger:          logger,
-			actuator:        actuator,
-			configValidator: configValidator,
-			statusUpdater:   extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			configValidator:   configValidator,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -144,12 +147,16 @@ func (r *reconciler) reconcile(ctx context.Context, logger logr.Logger, infrastr
 	}
 
 	if err := r.validateConfig(ctx, infrastructure); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, err, operationType, "Error checking infrastructure config")
 		return reconcile.Result{}, err
 	}
 
 	logger.Info("Starting the reconciliation of infrastructure", "infrastructure", kutil.ObjectName(infrastructure))
 	if err := r.actuator.Reconcile(ctx, infrastructure, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -172,6 +179,8 @@ func (r *reconciler) delete(ctx context.Context, logger logr.Logger, infrastruct
 	}
 
 	if err := r.actuator.Delete(ctx, infrastructure, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeDelete, "Error deleting infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -190,6 +199,8 @@ func (r *reconciler) migrate(ctx context.Context, logger logr.Logger, infrastruc
 	}
 
 	if err := r.actuator.Migrate(ctx, infrastructure, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeMigrate, "Error migrating infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -220,11 +231,15 @@ func (r *reconciler) restore(ctx context.Context, logger logr.Logger, infrastruc
 	}
 
 	if err := r.validateConfig(ctx, infrastructure); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, err, gardencorev1beta1.LastOperationTypeRestore, "Error checking infrastructure config")
 		return reconcile.Result{}, err
 	}
 
 	if err := r.actuator.Restore(ctx, infrastructure, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, infrastructure, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeRestore, "Error restoring infrastructure")
 		return reconcilerutils.ReconcileErr(err)
 	}

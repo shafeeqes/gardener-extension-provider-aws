@@ -28,6 +28,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/common"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
@@ -38,9 +39,10 @@ import (
 )
 
 type reconciler struct {
-	logger          logr.Logger
-	actuator        Actuator
-	watchdogManager common.WatchdogManager
+	logger            logr.Logger
+	actuator          Actuator
+	watchdogManager   common.WatchdogManager
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -49,16 +51,17 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // Worker resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator, watchdogManager common.WatchdogManager) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, watchdogManager common.WatchdogManager, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.Worker{} },
 		&reconciler{
-			logger:          logger,
-			actuator:        actuator,
-			watchdogManager: watchdogManager,
-			statusUpdater:   extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			watchdogManager:   watchdogManager,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -147,6 +150,8 @@ func (r *reconciler) migrate(ctx context.Context, logger logr.Logger, worker *ex
 
 	logger.Info("Starting the migration of worker", "worker", kutil.ObjectName(worker))
 	if err := r.actuator.Migrate(ctx, worker, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, worker, err, gardencorev1beta1.LastOperationTypeMigrate, "Error migrating worker")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -178,6 +183,8 @@ func (r *reconciler) delete(ctx context.Context, logger logr.Logger, worker *ext
 
 	logger.Info("Starting the deletion of worker", "worker", kutil.ObjectName(worker))
 	if err := r.actuator.Delete(ctx, worker, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, worker, err, gardencorev1beta1.LastOperationTypeDelete, "Error deleting worker")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -199,6 +206,8 @@ func (r *reconciler) reconcile(ctx context.Context, logger logr.Logger, worker *
 	}
 	logger.Info("Starting the reconciliation of worker", "worker", kutil.ObjectName(worker))
 	if err := r.actuator.Reconcile(ctx, worker, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, worker, err, operationType, "Error reconciling worker")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -221,6 +230,8 @@ func (r *reconciler) restore(ctx context.Context, logger logr.Logger, worker *ex
 
 	logger.Info("Starting the restoration of worker", "worker", kutil.ObjectName(worker))
 	if err := r.actuator.Restore(ctx, worker, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, worker, err, gardencorev1beta1.LastOperationTypeRestore, "Error restoring worker")
 		return reconcilerutils.ReconcileErr(err)
 	}

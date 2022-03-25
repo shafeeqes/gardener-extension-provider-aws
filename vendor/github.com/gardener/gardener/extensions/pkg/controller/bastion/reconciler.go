@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
@@ -36,8 +37,9 @@ import (
 )
 
 type reconciler struct {
-	logger   logr.Logger
-	actuator Actuator
+	logger            logr.Logger
+	actuator          Actuator
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -46,15 +48,16 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // bastion resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.Bastion{} },
 		&reconciler{
-			logger:        logger,
-			actuator:      actuator,
-			statusUpdater: extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -109,6 +112,8 @@ func (r *reconciler) reconcile(ctx context.Context, bastion *extensionsv1alpha1.
 
 	r.logger.Info("Starting the reconciliation of bastion", "bastion", kutil.ObjectName(bastion))
 	if err := r.actuator.Reconcile(ctx, bastion, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, bastion, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling bastion")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -134,6 +139,8 @@ func (r *reconciler) delete(ctx context.Context, bastion *extensionsv1alpha1.Bas
 	r.logger.Info("Starting the deletion of bastion", "bastion", kutil.ObjectName(bastion))
 
 	if err := r.actuator.Delete(ctx, bastion, cluster); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, bastion, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error deleting bastion")
 		return reconcilerutils.ReconcileErr(err)
 	}

@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 
 	"github.com/gardener/gardener/pkg/utils/kubernetes/health"
@@ -85,7 +86,7 @@ func (healthChecker *DeploymentHealthChecker) DeepCopy() healthcheck.HealthCheck
 }
 
 // Check executes the health check
-func (healthChecker *DeploymentHealthChecker) Check(ctx context.Context, request types.NamespacedName) (*healthcheck.SingleCheckResult, error) {
+func (healthChecker *DeploymentHealthChecker) Check(ctx context.Context, request types.NamespacedName, errorCodeDetector errorutil.ErrorCodeDetector) (*healthcheck.SingleCheckResult, error) {
 	deployment := &appsv1.Deployment{}
 
 	var err error

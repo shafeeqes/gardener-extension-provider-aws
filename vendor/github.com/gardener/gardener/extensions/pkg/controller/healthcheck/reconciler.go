@@ -29,6 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	"github.com/gardener/gardener/pkg/api/extensions"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	gardenv1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
@@ -38,8 +39,9 @@ import (
 )
 
 type reconciler struct {
-	logger   logr.Logger
-	actuator HealthCheckActuator
+	logger            logr.Logger
+	actuator          HealthCheckActuator
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client client.Client
 
@@ -58,10 +60,11 @@ const (
 
 // NewReconciler creates a new performHealthCheck.Reconciler that reconciles
 // the registered extension resources (Gardener's `extensions.gardener.cloud` API group).
-func NewReconciler(actuator HealthCheckActuator, registeredExtension RegisteredExtension, syncPeriod metav1.Duration) reconcile.Reconciler {
+func NewReconciler(actuator HealthCheckActuator, registeredExtension RegisteredExtension, syncPeriod metav1.Duration, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	return &reconciler{
 		logger:              log.Log.WithName(ControllerName),
 		actuator:            actuator,
+		errorCodeDetector:   errorCodeDetector,
 		registeredExtension: registeredExtension,
 		syncPeriod:          syncPeriod,
 	}

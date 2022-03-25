@@ -30,8 +30,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
-	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/controllerutils"
 )
@@ -45,12 +45,12 @@ const (
 
 type factory struct{}
 
-func (factory) NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string) (Terraformer, error) {
-	return NewForConfig(logger, config, purpose, namespace, name, image)
+func (factory) NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) (Terraformer, error) {
+	return NewForConfig(logger, config, purpose, namespace, name, image, errorCodeDetector)
 }
 
-func (f factory) New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string) Terraformer {
-	return New(logger, client, coreV1Client, purpose, namespace, name, image)
+func (f factory) New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) Terraformer {
+	return New(logger, client, coreV1Client, purpose, namespace, name, image, errorCodeDetector)
 }
 
 func (f factory) DefaultInitializer(c client.Client, main, variables string, tfVars []byte, stateInitializer StateConfigMapInitializer) Initializer {
@@ -70,6 +70,7 @@ func NewForConfig(
 	namespace,
 	name,
 	image string,
+	errorCodeDetector errorutil.ErrorCodeDetector,
 ) (
 	Terraformer,
 	error,
@@ -84,7 +85,7 @@ func NewForConfig(
 		return nil, err
 	}
 
-	return New(logger, c, coreV1Client, purpose, namespace, name, image), nil
+	return New(logger, c, coreV1Client, purpose, namespace, name, image, errorCodeDetector), nil
 }
 
 // New takes a <logger>, a <k8sClient>, a string <purpose>, which describes for what the
@@ -100,13 +101,15 @@ func New(
 	namespace,
 	name,
 	image string,
+	errorCodeDetector errorutil.ErrorCodeDetector,
 ) Terraformer {
 	var prefix = fmt.Sprintf("%s.%s", name, purpose)
 
 	return &terraformer{
-		logger:       logger.WithName("terraformer"),
-		client:       c,
-		coreV1Client: coreV1Client,
+		logger:            logger.WithName("terraformer"),
+		client:            c,
+		coreV1Client:      coreV1Client,
+		errorCodeDetector: errorCodeDetector,
 
 		name:      name,
 		namespace: namespace,
@@ -281,7 +284,7 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 			if terraformErrors := findTerraformErrors(terminationMessage); terraformErrors != "" {
 				errorMessage += fmt.Sprintf(":\n\n%s", terraformErrors)
 			}
-			return gardencorev1beta1helper.DetermineError(errors.New(errorMessage), errorMessage)
+			return t.errorCodeDetector.DetermineError(errors.New(errorMessage))
 		}
 	}
 

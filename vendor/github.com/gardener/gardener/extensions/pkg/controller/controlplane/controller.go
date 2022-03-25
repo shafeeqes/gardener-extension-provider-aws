@@ -22,6 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	extensionspredicate "github.com/gardener/gardener/extensions/pkg/predicate"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/controllerutils/mapper"
 )
@@ -37,6 +38,8 @@ const (
 type AddArgs struct {
 	// Actuator is an controlplane actuator.
 	Actuator Actuator
+	// ErrorCodeDetector determines the Gardener error codes for errors.
+	ErrorCodeDetector errorutil.ErrorCodeDetector
 	// ControllerOptions are the controller options used for creating a controller.
 	// The options.Reconciler is always overridden with a reconciler created from the
 	// given actuator.
@@ -60,7 +63,7 @@ func DefaultPredicates(ignoreOperationAnnotation bool) []predicate.Predicate {
 // Add creates a new ControlPlane Controller and adds it to the Manager.
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, args AddArgs) error {
-	args.ControllerOptions.Reconciler = NewReconciler(args.Actuator)
+	args.ControllerOptions.Reconciler = NewReconciler(args.Actuator, args.ErrorCodeDetector)
 	args.ControllerOptions.RecoverPanic = true
 
 	ctrl, err := controller.New(ControllerName, mgr, args.ControllerOptions)

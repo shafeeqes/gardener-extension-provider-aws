@@ -19,6 +19,7 @@ import (
 
 	healthcheckconfig "github.com/gardener/gardener/extensions/pkg/controller/healthcheck/config"
 	extensionspredicate "github.com/gardener/gardener/extensions/pkg/predicate"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	"github.com/gardener/gardener/pkg/api/extensions"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/controllerutils/mapper"
@@ -42,6 +43,8 @@ const (
 
 // AddArgs are arguments for adding an health check controller to a controller-runtime manager.
 type AddArgs struct {
+	// ErrorCodeDetector determines the Gardener error codes for errors.
+	ErrorCodeDetector errorutil.ErrorCodeDetector
 	// ControllerOptions are the controller options used for creating a controller.
 	// The options.Reconciler is always overridden with a reconciler created from the
 	// given actuator.
@@ -65,6 +68,8 @@ type AddArgs struct {
 type DefaultAddArgs struct {
 	// Controller are the controller.Options.
 	Controller controller.Options
+	// ErrorCodeDetector determines the Gardener error codes for errors.
+	ErrorCodeDetector errorutil.ErrorCodeDetector
 	// HealthCheckConfig contains additional config for the health check controller
 	HealthCheckConfig healthcheckconfig.HealthCheckConfig
 }
@@ -108,7 +113,7 @@ func DefaultRegistration(extensionType string, kind schema.GroupVersionKind, get
 		return err
 	}
 
-	healthCheckActuator := NewActuator(args.Type, args.GetExtensionGroupVersionKind().Kind, getExtensionObjFunc, healthChecks)
+	healthCheckActuator := NewActuator(args.Type, args.GetExtensionGroupVersionKind().Kind, getExtensionObjFunc, healthChecks, args.ErrorCodeDetector)
 	return Register(mgr, args, healthCheckActuator)
 }
 
@@ -150,7 +155,7 @@ func DefaultPredicates() []predicate.Predicate {
 // Add creates a new Reconciler and adds it to the Manager.
 // and Start it when the Manager is Started.
 func Register(mgr manager.Manager, args AddArgs, actuator HealthCheckActuator) error {
-	args.ControllerOptions.Reconciler = NewReconciler(actuator, *args.registeredExtension, args.SyncPeriod)
+	args.ControllerOptions.Reconciler = NewReconciler(actuator, *args.registeredExtension, args.SyncPeriod, args.ErrorCodeDetector)
 	args.ControllerOptions.RecoverPanic = true
 	return add(mgr, args)
 }

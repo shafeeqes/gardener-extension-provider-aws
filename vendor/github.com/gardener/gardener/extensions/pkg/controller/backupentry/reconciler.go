@@ -28,6 +28,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/controller/common"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
@@ -38,8 +39,9 @@ import (
 )
 
 type reconciler struct {
-	logger   logr.Logger
-	actuator Actuator
+	logger            logr.Logger
+	actuator          Actuator
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	client        client.Client
 	reader        client.Reader
@@ -48,15 +50,16 @@ type reconciler struct {
 
 // NewReconciler creates a new reconcile.Reconciler that reconciles
 // backupentry resources of Gardener's `extensions.gardener.cloud` API group.
-func NewReconciler(actuator Actuator) reconcile.Reconciler {
+func NewReconciler(actuator Actuator, errorCodeDetector errorutil.ErrorCodeDetector) reconcile.Reconciler {
 	logger := log.Log.WithName(ControllerName)
 
 	return reconcilerutils.OperationAnnotationWrapper(
 		func() client.Object { return &extensionsv1alpha1.BackupEntry{} },
 		&reconciler{
-			logger:        logger,
-			actuator:      actuator,
-			statusUpdater: extensionscontroller.NewStatusUpdater(logger),
+			logger:            logger,
+			actuator:          actuator,
+			errorCodeDetector: errorCodeDetector,
+			statusUpdater:     extensionscontroller.NewStatusUpdater(logger),
 		},
 	)
 }
@@ -148,6 +151,8 @@ func (r *reconciler) reconcile(ctx context.Context, be *extensionsv1alpha1.Backu
 
 	r.logger.Info("Starting the reconciliation of backupentry", "backupentry", kutil.ObjectName(be))
 	if err := r.actuator.Reconcile(ctx, be); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, be, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error reconciling backupentry")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -178,6 +183,8 @@ func (r *reconciler) restore(ctx context.Context, be *extensionsv1alpha1.BackupE
 
 	r.logger.Info("Starting the restoration of backupentry", "backupentry", kutil.ObjectName(be))
 	if err := r.actuator.Restore(ctx, be); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, be, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeRestore, "Error restoring backupentry")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -221,6 +228,8 @@ func (r *reconciler) delete(ctx context.Context, be *extensionsv1alpha1.BackupEn
 	}
 
 	if err := r.actuator.Delete(ctx, be); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, be, reconcilerutils.ReconcileErrCauseOrErr(err), operationType, "Error deleting backupentry")
 		return reconcilerutils.ReconcileErr(err)
 	}
@@ -248,6 +257,8 @@ func (r *reconciler) migrate(ctx context.Context, be *extensionsv1alpha1.BackupE
 
 	r.logger.Info("Starting the migration of backupentry", "backupentry", kutil.ObjectName(be))
 	if err := r.actuator.Migrate(ctx, be); err != nil {
+		// TODO(shafeeqes): Enable this after DetermineError function is adapted in the extensions
+		// err = r.errorCodeDetector.DetermineError(err)
 		_ = r.statusUpdater.Error(ctx, be, reconcilerutils.ReconcileErrCauseOrErr(err), gardencorev1beta1.LastOperationTypeMigrate, "Error migrating backupentry")
 		return reconcilerutils.ReconcileErr(err)
 	}
