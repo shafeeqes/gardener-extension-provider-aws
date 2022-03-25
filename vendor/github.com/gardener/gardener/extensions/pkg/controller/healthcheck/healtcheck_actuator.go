@@ -23,6 +23,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/util"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 
 	"github.com/go-logr/logr"
@@ -37,7 +38,8 @@ import (
 
 // Actuator contains all the health checks and the means to execute them
 type Actuator struct {
-	logger logr.Logger
+	logger            logr.Logger
+	errorCodeDetector errorutil.ErrorCodeDetector
 
 	restConfig *rest.Config
 	seedClient client.Client
@@ -51,13 +53,14 @@ type Actuator struct {
 }
 
 // NewActuator creates a new Actuator.
-func NewActuator(provider, extensionKind string, getExtensionObjFunc GetExtensionObjectFunc, healthChecks []ConditionTypeToHealthCheck) HealthCheckActuator {
+func NewActuator(provider, extensionKind string, getExtensionObjFunc GetExtensionObjectFunc, healthChecks []ConditionTypeToHealthCheck, errorCodeDetector errorutil.ErrorCodeDetector) HealthCheckActuator {
 	return &Actuator{
 		healthChecks:        healthChecks,
 		getExtensionObjFunc: getExtensionObjFunc,
 		provider:            provider,
 		extensionKind:       extensionKind,
 		logger:              log.Log.WithName(fmt.Sprintf("%s-%s-healthcheck-actuator", provider, extensionKind)),
+		errorCodeDetector:   errorCodeDetector,
 	}
 }
 
@@ -175,7 +178,7 @@ func (a *Actuator) ExecuteHealthCheckFunctions(ctx context.Context, request type
 				}
 			}
 
-			healthCheckResult, err := check.Check(ctx, request)
+			healthCheckResult, err := check.Check(ctx, request, a.errorCodeDetector)
 			channel <- channelResult{
 				healthCheckResult:   healthCheckResult,
 				error:               err,

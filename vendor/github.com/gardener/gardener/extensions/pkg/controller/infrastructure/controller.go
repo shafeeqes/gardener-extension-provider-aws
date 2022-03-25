@@ -23,6 +23,7 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	extensionspredicate "github.com/gardener/gardener/extensions/pkg/predicate"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/controllerutils/mapper"
 )
@@ -41,7 +42,7 @@ type AddArgs struct {
 	// ConfigValidator is an infrastructure config validator.
 	ConfigValidator ConfigValidator
 	// ErrorCodeDetector is an interface which determines Gardener error codes for errors.
-	ErrorCodeDetector ErrorCodeDetector
+	ErrorCodeDetector errorutil.ErrorCodeDetector
 	// ControllerOptions are the controller options used for creating a controller.
 	// The options.Reconciler is always overridden with a reconciler created from the
 	// given actuator.

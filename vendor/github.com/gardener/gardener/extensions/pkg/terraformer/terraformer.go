@@ -30,8 +30,8 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
-	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	"github.com/gardener/gardener/pkg/client/kubernetes"
 	"github.com/gardener/gardener/pkg/controllerutils"
 )
@@ -45,12 +45,12 @@ const (
 
 type factory struct{}
 
-func (factory) NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string) (Terraformer, error) {
-	return NewForConfig(logger, config, purpose, namespace, name, image)
+func (factory) NewForConfig(logger logr.Logger, config *rest.Config, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) (Terraformer, error) {
+	return NewForConfig(logger, config, purpose, namespace, name, image, errorCodeDetector)
 }
 
-func (f factory) New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string) Terraformer {
-	return New(logger, client, coreV1Client, purpose, namespace, name, image)
+func (f factory) New(logger logr.Logger, client client.Client, coreV1Client corev1client.CoreV1Interface, purpose, namespace, name, image string, errorCodeDetector errorutil.ErrorCodeDetector) Terraformer {
+	return New(logger, client, coreV1Client, purpose, namespace, name, image, errorCodeDetector)
 }
 
 func (f factory) DefaultInitializer(c client.Client, main, variables string, tfVars []byte, stateInitializer StateConfigMapInitializer) Initializer {
@@ -70,6 +70,7 @@ func NewForConfig(
 	namespace,
 	name,
 	image string,
+	errorCodeDetector errorutil.ErrorCodeDetector,
 ) (
 	Terraformer,
 	error,
@@ -84,7 +85,7 @@ func NewForConfig(
 		return nil, err
 	}
 
-	return New(logger, c, coreV1Client, purpose, namespace, name, image), nil
+	return New(logger, c, coreV1Client, purpose, namespace, name, image, errorCodeDetector), nil
 }
 
 // New takes a <logger>, a <k8sClient>, a string <purpose>, which describes for what the
@@ -100,13 +101,15 @@ func New(
 	namespace,
 	name,
 	image string,
+	errorCodeDetector errorutil.ErrorCodeDetector,
 ) Terraformer {
 	var prefix = fmt.Sprintf("%s.%s", name, purpose)
 
 	return &terraformer{
-		logger:       logger.WithName("terraformer"),
-		client:       c,
-		coreV1Client: coreV1Client,
+		logger:            logger.WithName("terraformer"),
+		client:            c,
+		coreV1Client:      coreV1Client,
+		errorCodeDetector: errorCodeDetector,
 
 		name:      name,
 		namespace: namespace,
@@ -199,7 +202,8 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 			deployNewPod = false
 		} else {
 			// delete still existing pod and wait until it's gone
-			logger.Info(fmt.Sprintf("Still existing Terraform pod with command %q found - ensuring the cleanup before starting a new Terraform pod with command %q", cmd, command))
+			oldPod := &podList.Items[0]
+			logger.Info("Found old Terraformer pod with other command, ensuring cleanup", "command", cmd, "oldPod", oldPod)
 			if err := t.EnsureCleanedUp(ctx); err != nil {
 				return err
 			}
@@ -207,7 +211,7 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 
 	case len(podList.Items) > 1:
 		// unreachable
-		logger.Error(fmt.Errorf("too many Terraformer pods"), "Unexpected number of still existing Terraformer pods: %d", len(podList.Items))
+		logger.Error(fmt.Errorf("too many Terraformer pods"), "Unexpected number of still existing Terraformer pods", "numberOfPods", len(podList.Items))
 		if err := t.EnsureCleanedUp(ctx); err != nil {
 			return err
 		}
@@ -246,9 +250,9 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 			podLogger.Info("Terraformer pod finished with error")
 
 			if terminationMessage != "" {
-				podLogger.Info("Termination message of Terraformer pod: " + terminationMessage)
-			} else if ctx.Err() != nil {
-				podLogger.Info("Context error: " + ctx.Err().Error())
+				podLogger.Info("Terraformer pod terminated with message", "terminationMessage", terminationMessage)
+			} else if ctxErr := ctx.Err(); ctxErr != nil {
+				podLogger.Info("Context error", "err", ctxErr.Error())
 			} else {
 				// fall back to pod logs as termination message
 				podLogger.Info("Fetching logs of Terraformer pod as termination message is empty")
@@ -257,7 +261,7 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 					podLogger.Error(err, "Could not retrieve logs of Terraformer pod")
 					return err
 				}
-				podLogger.Info("Logs of Terraformer pod: " + terminationMessage)
+				podLogger.Info("Terraformer pod terminated with logs", "logs", terminationMessage)
 			}
 		}
 
@@ -280,7 +284,7 @@ func (t *terraformer) execute(ctx context.Context, command string) error {
 			if terraformErrors := findTerraformErrors(terminationMessage); terraformErrors != "" {
 				errorMessage += fmt.Sprintf(":\n\n%s", terraformErrors)
 			}
-			return gardencorev1beta1helper.DetermineError(errors.New(errorMessage), errorMessage)
+			return t.errorCodeDetector.DetermineError(errors.New(errorMessage))
 		}
 	}
 

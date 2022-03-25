@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/healthcheck"
+	errorutil "github.com/gardener/gardener/extensions/pkg/util/error"
 	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 
@@ -92,7 +93,7 @@ func (h *DefaultHealthChecker) DeepCopy() healthcheck.HealthCheck {
 }
 
 // Check executes the health check.
-func (h *DefaultHealthChecker) Check(ctx context.Context, request types.NamespacedName) (*healthcheck.SingleCheckResult, error) {
+func (h *DefaultHealthChecker) Check(ctx context.Context, request types.NamespacedName, errorCodeDetector errorutil.ErrorCodeDetector) (*healthcheck.SingleCheckResult, error) {
 	machineDeploymentList := &machinev1alpha1.MachineDeploymentList{}
 	if err := h.seedClient.List(ctx, machineDeploymentList, client.InNamespace(request.Namespace)); err != nil {
 		err := fmt.Errorf("unable to check nodes. Failed to list machine deployments in namespace %q: %w", request.Namespace, err)
@@ -147,7 +148,7 @@ func (h *DefaultHealthChecker) Check(ctx context.Context, request types.Namespac
 			return &healthcheck.SingleCheckResult{
 				Status: gardencorev1beta1.ConditionFalse,
 				Detail: err.Error(),
-				Codes:  gardencorev1beta1helper.DetermineErrorCodes(err),
+				Codes:  gardencorev1beta1helper.ExtractErrorCodes(errorCodeDetector.DetermineError(err)),
 			}, nil
 		}
 
@@ -165,7 +166,7 @@ func (h *DefaultHealthChecker) Check(ctx context.Context, request types.Namespac
 			return &healthcheck.SingleCheckResult{
 				Status:               status,
 				Detail:               err.Error(),
-				Codes:                gardencorev1beta1helper.DetermineErrorCodes(err),
+				Codes:                gardencorev1beta1helper.ExtractErrorCodes(errorCodeDetector.DetermineError(err)),
 				ProgressingThreshold: h.scaleUpProgressingThreshold,
 			}, nil
 		}
@@ -176,7 +177,7 @@ func (h *DefaultHealthChecker) Check(ctx context.Context, request types.Namespac
 		return &healthcheck.SingleCheckResult{
 			Status: gardencorev1beta1.ConditionFalse,
 			Detail: err.Error(),
-			Codes:  gardencorev1beta1helper.DetermineErrorCodes(err),
+			Codes:  gardencorev1beta1helper.ExtractErrorCodes(errorCodeDetector.DetermineError(err)),
 		}, nil
 	}
 
@@ -185,7 +186,7 @@ func (h *DefaultHealthChecker) Check(ctx context.Context, request types.Namespac
 		return &healthcheck.SingleCheckResult{
 			Status:               status,
 			Detail:               err.Error(),
-			Codes:                gardencorev1beta1helper.DetermineErrorCodes(err),
+			Codes:                gardencorev1beta1helper.ExtractErrorCodes(errorCodeDetector.DetermineError(err)),
 			ProgressingThreshold: h.scaleDownProgressingThreshold,
 		}, nil
 	}
