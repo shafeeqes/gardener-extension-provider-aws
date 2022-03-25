@@ -25,7 +25,6 @@ import (
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
 	"github.com/gardener/gardener/extensions/pkg/terraformer"
-	gardencorev1beta1helper "github.com/gardener/gardener/pkg/apis/core/v1beta1/helper"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	"github.com/gardener/gardener/pkg/utils/flow"
 	"github.com/go-logr/logr"
@@ -111,7 +110,7 @@ func Delete(
 				}
 
 				if err := destroyKubernetesLoadBalancersAndSecurityGroups(ctx, awsClient, vpcID, infrastructure.Namespace); err != nil {
-					return gardencorev1beta1helper.DetermineError(err, fmt.Sprintf("Failed to destroy load balancers and security groups: %+v", err.Error()))
+					return fmt.Errorf("Failed to destroy load balancers and security groups: %+v", err.Error())
 				}
 
 				return nil

@@ -15,6 +15,7 @@
 package csimigration
 
 import (
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/csimigration"
@@ -35,6 +36,7 @@ type AddOptions struct {
 // The opts.Reconciler is being set with a newly instantiated actuator.
 func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 	return csimigration.Add(mgr, csimigration.AddArgs{
+		ErrorCodeDetector:             helper.NewErrorCodeDetector(),
 		ControllerOptions:             opts.Controller,
 		CSIMigrationKubernetesVersion: aws.CSIMigrationKubernetesVersion,
 		Type:                          aws.Type,

@@ -15,6 +15,7 @@
 package controlplane
 
 import (
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/imagevector"
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
@@ -61,6 +62,7 @@ func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 			configChart, controlPlaneChart, controlPlaneShootChart, controlPlaneShootCRDsChart, storageClassChart, cpExposureChart,
 			NewValuesProvider(logger, opts.UseTokenRequestor, opts.UseProjectedTokenMount), extensionscontroller.ChartRendererFactoryFunc(util.NewChartRendererForShoot),
 			imagevector.ImageVector(), aws.CloudProviderConfigName, opts.ShootWebhooks, mgr.GetWebhookServer().Port, logger),
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 		ControllerOptions: opts.Controller,
 		Predicates:        controlplane.DefaultPredicates(opts.IgnoreOperationAnnotation),
 		Type:              aws.Type,

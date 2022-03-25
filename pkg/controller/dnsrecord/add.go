@@ -17,6 +17,7 @@ package dnsrecord
 import (
 	"time"
 
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 
@@ -60,6 +61,7 @@ func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 	logger.Info("Adding dnsrecord controller", "RateLimiterOptions", opts.RateLimiter)
 	return dnsrecord.Add(mgr, dnsrecord.AddArgs{
 		Actuator:          NewActuator(awsclient.NewRoute53Factory(opts.RateLimiter.Limit, opts.RateLimiter.Burst, opts.RateLimiter.WaitTimeout), logger),
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 		ControllerOptions: opts.Controller,
 		Predicates:        dnsrecord.DefaultPredicates(opts.IgnoreOperationAnnotation),
 		Type:              aws.DNSType,

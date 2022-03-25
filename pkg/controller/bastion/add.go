@@ -15,6 +15,7 @@
 package bastion
 
 import (
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 
 	"github.com/gardener/gardener/extensions/pkg/controller/bastion"
@@ -43,6 +44,7 @@ type AddOptions struct {
 func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 	return bastion.Add(mgr, bastion.AddArgs{
 		Actuator:          newActuator(),
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 		ControllerOptions: opts.Controller,
 		Predicates:        bastion.DefaultPredicates(opts.IgnoreOperationAnnotation),
 		Type:              aws.Type,

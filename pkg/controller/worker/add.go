@@ -15,6 +15,7 @@
 package worker
 
 import (
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	"github.com/gardener/gardener/extensions/pkg/controller/worker"
 
@@ -55,6 +56,7 @@ func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 
 	return worker.Add(mgr, worker.AddArgs{
 		Actuator:          NewActuator(opts.UseTokenRequestor, opts.UseProjectedTokenMount),
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 		ControllerOptions: opts.Controller,
 		Predicates:        worker.DefaultPredicates(opts.IgnoreOperationAnnotation),
 		Type:              aws.Type,

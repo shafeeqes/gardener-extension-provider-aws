@@ -15,6 +15,7 @@
 package infrastructure
 
 import (
+	"github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
 	"github.com/gardener/gardener-extension-provider-aws/pkg/aws"
 	awsclient "github.com/gardener/gardener-extension-provider-aws/pkg/aws/client"
 	"github.com/gardener/gardener/extensions/pkg/controller/infrastructure"
@@ -45,6 +46,7 @@ func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
 	return infrastructure.Add(mgr, infrastructure.AddArgs{
 		Actuator:          NewActuator(opts.UseProjectedTokenMount),
 		ConfigValidator:   NewConfigValidator(awsclient.FactoryFunc(awsclient.NewInterface), log.Log),
+		ErrorCodeDetector: helper.NewErrorCodeDetector(),
 		ControllerOptions: opts.Controller,
 		Predicates:        infrastructure.DefaultPredicates(opts.IgnoreOperationAnnotation),
 		Type:              aws.Type,
