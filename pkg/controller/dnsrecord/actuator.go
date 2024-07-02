@@ -7,6 +7,7 @@ package dnsrecord
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	extensionscontroller "github.com/gardener/gardener/extensions/pkg/controller"
@@ -19,6 +20,7 @@ import (
 	"github.com/gardener/gardener/pkg/controllerutils/reconciler"
 	kutil "github.com/gardener/gardener/pkg/utils/kubernetes"
 	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -83,6 +85,10 @@ func (a *actuator) Reconcile(ctx context.Context, log logr.Logger, dns *extensio
 
 // Delete deletes the DNSRecord.
 func (a *actuator) Delete(ctx context.Context, log logr.Logger, dns *extensionsv1alpha1.DNSRecord, _ *extensionscontroller.Cluster) error {
+	if strings.EqualFold(dns.Annotations["shoot.gardener.cloud/live-migrate"], "true") {
+		return nil
+	}
+
 	// Create AWS client
 	credentials, err := aws.GetCredentialsFromSecretRef(ctx, a.client, dns.Spec.SecretRef, true)
 	if err != nil {
@@ -122,7 +128,15 @@ func (a *actuator) Restore(ctx context.Context, log logr.Logger, dns *extensions
 }
 
 // Migrate migrates the DNSRecord.
-func (a *actuator) Migrate(_ context.Context, _ logr.Logger, _ *extensionsv1alpha1.DNSRecord, _ *extensionscontroller.Cluster) error {
+func (a *actuator) Migrate(ctx context.Context, log logr.Logger, dns *extensionsv1alpha1.DNSRecord, cluster *extensionscontroller.Cluster) error {
+	if cluster.Shoot != nil && strings.EqualFold(cluster.Shoot.Annotations["shoot.gardener.cloud/live-migrate"], "true") {
+		patch := client.MergeFrom(dns.DeepCopy())
+		metav1.SetMetaDataAnnotation(&dns.ObjectMeta, "shoot.gardener.cloud/live-migrate", "true")
+		if err := a.client.Status().Patch(ctx, dns, patch); err != nil {
+			return fmt.Errorf("error patching DNS record %s: %v", client.ObjectKeyFromObject(dns), err)
+		}
+	}
+
 	return nil
 }
 
