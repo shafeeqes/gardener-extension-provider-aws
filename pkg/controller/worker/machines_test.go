@@ -397,10 +397,6 @@ var _ = Describe("Machines", func() {
 										},
 									}),
 								},
-								UserDataSecretRef: &corev1.SecretKeySelector{
-									LocalObjectReference: corev1.LocalObjectReference{Name: userDataSecretName},
-									Key:                  userDataSecretDataKey,
-								},
 								Volume: &extensionsv1alpha1.Volume{
 									Type:      &volumeType,
 									Size:      fmt.Sprintf("%dGi", volumeSize),
@@ -441,9 +437,6 @@ var _ = Describe("Machines", func() {
 									Name:    machineImageName,
 									Version: machineImageVersion,
 								},
-								// TODO: Use UserDataSecretRef like in first pool once this field got removed from the
-								//  API.
-								UserData: userData,
 								Volume: &extensionsv1alpha1.Volume{
 									Type: &volumeType,
 									Size: fmt.Sprintf("%dGi", volumeSize),
