@@ -153,6 +153,6 @@ require (
 	sigs.k8s.io/yaml v1.4.0 // indirect
 )
 
-replace github.com/gardener/gardener => github.com/shafeeqes/gardener v1.32.1-0.20241006125244-14f7a9fc9d3d
+replace github.com/gardener/gardener => github.com/shafeeqes/gardener v1.32.1-0.20241006144322-f5499ed8fff7
 
 replace github.com/gardener/machine-controller-manager => github.com/shafeeqes/machine-controller-manager v0.42.1-0.20241006123957-e285a5d5d2cf
