@@ -33,6 +33,7 @@ import (
 	"github.com/gardener/gardener-extension-provider-aws/charts"
 	awsapi "github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws"
 	awsapihelper "github.com/gardener/gardener-extension-provider-aws/pkg/apis/aws/helper"
+	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 )
 
 const (
@@ -234,7 +235,12 @@ func (w *WorkerDelegate) generateMachineConfig(ctx context.Context) error {
 			var (
 				deploymentName = fmt.Sprintf("%s-%s-z%d", w.worker.Namespace, pool.Name, zoneIndex+1)
 				className      = fmt.Sprintf("%s-%s", deploymentName, workerPoolHash)
+				updateStrategy = gardencorev1beta1.RollingUpdate
 			)
+
+			if pool.UpdateStrategy != nil {
+				updateStrategy = *pool.UpdateStrategy
+			}
 
 			machineDeployments = append(machineDeployments, worker.MachineDeployment{
 				Name:           deploymentName,
@@ -253,6 +259,7 @@ func (w *WorkerDelegate) generateMachineConfig(ctx context.Context) error {
 				Taints:                       pool.Taints,
 				MachineConfiguration:         genericworkeractuator.ReadMachineConfiguration(pool),
 				ClusterAutoscalerAnnotations: extensionsv1alpha1helper.GetMachineDeploymentClusterAutoscalerAnnotations(pool.ClusterAutoscaler),
+				UpdateStrategy:               updateStrategy,
 			})
 
 			machineClassSpec["name"] = className
