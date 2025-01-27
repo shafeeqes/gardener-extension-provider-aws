@@ -19,6 +19,7 @@ import (
 	"github.com/gardener/gardener/extensions/pkg/controller/worker"
 	genericworkeractuator "github.com/gardener/gardener/extensions/pkg/controller/worker/genericactuator"
 	"github.com/gardener/gardener/pkg/apis/core/v1beta1"
+	gardencorev1beta1 "github.com/gardener/gardener/pkg/apis/core/v1beta1"
 	v1beta1constants "github.com/gardener/gardener/pkg/apis/core/v1beta1/constants"
 	extensionsv1alpha1 "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1"
 	extensionsv1alpha1helper "github.com/gardener/gardener/pkg/apis/extensions/v1alpha1/helper"
@@ -234,7 +235,12 @@ func (w *WorkerDelegate) generateMachineConfig(ctx context.Context) error {
 			var (
 				deploymentName = fmt.Sprintf("%s-%s-z%d", w.worker.Namespace, pool.Name, zoneIndex+1)
 				className      = fmt.Sprintf("%s-%s", deploymentName, workerPoolHash)
+				updateStrategy = gardencorev1beta1.AutoRollingUpdate
 			)
+
+			if pool.UpdateStrategy != nil {
+				updateStrategy = *pool.UpdateStrategy
+			}
 
 			machineDeployments = append(machineDeployments, worker.MachineDeployment{
 				Name:           deploymentName,
@@ -253,6 +259,7 @@ func (w *WorkerDelegate) generateMachineConfig(ctx context.Context) error {
 				Taints:                       pool.Taints,
 				MachineConfiguration:         genericworkeractuator.ReadMachineConfiguration(pool),
 				ClusterAutoscalerAnnotations: extensionsv1alpha1helper.GetMachineDeploymentClusterAutoscalerAnnotations(pool.ClusterAutoscaler),
+				UpdateStrategy:               updateStrategy,
 			})
 
 			machineClassSpec["name"] = className
