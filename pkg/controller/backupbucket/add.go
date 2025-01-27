@@ -32,8 +32,8 @@ type AddOptions struct {
 
 // AddToManagerWithOptions adds a controller with the given Options to the given manager.
 // The opts.Reconciler is being set with a newly instantiated actuator.
-func AddToManagerWithOptions(ctx context.Context, mgr manager.Manager, opts AddOptions) error {
-	return backupbucket.Add(ctx, mgr, backupbucket.AddArgs{
+func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
+	return backupbucket.Add(mgr, backupbucket.AddArgs{
 		Actuator:          newActuator(mgr),
 		ControllerOptions: opts.Controller,
 		Predicates:        backupbucket.DefaultPredicates(opts.IgnoreOperationAnnotation),
@@ -43,6 +43,6 @@ func AddToManagerWithOptions(ctx context.Context, mgr manager.Manager, opts AddO
 }
 
 // AddToManager adds a controller with the default Options.
-func AddToManager(ctx context.Context, mgr manager.Manager) error {
-	return AddToManagerWithOptions(ctx, mgr, DefaultAddOptions)
+func AddToManager(_ context.Context, mgr manager.Manager) error {
+	return AddToManagerWithOptions(mgr, DefaultAddOptions)
 }

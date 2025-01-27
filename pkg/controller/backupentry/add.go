@@ -33,8 +33,8 @@ type AddOptions struct {
 
 // AddToManagerWithOptions adds a controller with the given Options to the given manager.
 // The opts.Reconciler is being set with a newly instantiated actuator.
-func AddToManagerWithOptions(ctx context.Context, mgr manager.Manager, opts AddOptions) error {
-	return backupentry.Add(ctx, mgr, backupentry.AddArgs{
+func AddToManagerWithOptions(mgr manager.Manager, opts AddOptions) error {
+	return backupentry.Add(mgr, backupentry.AddArgs{
 		Actuator:          genericactuator.NewActuator(mgr, newActuator(mgr)),
 		ControllerOptions: opts.Controller,
 		Predicates:        backupentry.DefaultPredicates(opts.IgnoreOperationAnnotation),
@@ -44,6 +44,6 @@ func AddToManagerWithOptions(ctx context.Context, mgr manager.Manager, opts AddO
 }
 
 // AddToManager adds a controller with the default Options.
-func AddToManager(ctx context.Context, mgr manager.Manager) error {
-	return AddToManagerWithOptions(ctx, mgr, DefaultAddOptions)
+func AddToManager(_ context.Context, mgr manager.Manager) error {
+	return AddToManagerWithOptions(mgr, DefaultAddOptions)
 }
